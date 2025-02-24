@@ -12,10 +12,10 @@ class CWA_DB:
         self.verbose = verbose
 
         self.db_file = "cwa.db"
-        self.db_path = "/config/"
+        self.db_path = "/var/lib/cwa/"
         self.con, self.cur = self.connect_to_db() # type: ignore
 
-        self.schema_path = "/app/calibre-web-automated/scripts/cwa_schema.sql"
+        self.schema_path = "/opt/cwa/scripts/cwa_schema.sql"
         self.stats_tables = ["cwa_enforcement", "cwa_import", "cwa_conversions", "epub_fixes"]
         self.tables, self.schema = self.make_tables()
 

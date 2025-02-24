@@ -20,13 +20,13 @@ def main():
 
 class AutoLibrary:
     def __init__(self):
-        self.config_dir = "/config"
-        self.library_dir = "/calibre-library"
-        self.dirs_path = "/app/calibre-web-automated/dirs.json"
-        self.app_db = "/config/app.db"
+        self.config_dir = "/var/lib/cwa"
+        self.library_dir = "/opt/calibre-web"
+        self.dirs_path = "/opt/cwa/dirs.json"
+        self.app_db = "/var/lib/cwa/app.db"
 
-        self.empty_appdb = "/app/calibre-web-automated/empty_library/app.db"
-        self.empty_metadb = "/app/calibre-web-automated/empty_library/metadata.db"
+        self.empty_appdb = "/opt/cwa/empty_library/app.db"
+        self.empty_metadb = "/opt/cwa/empty_library/metadata.db"
 
         self.metadb_path = None
         self.lib_path = None
@@ -44,14 +44,13 @@ class AutoLibrary:
             self._metadb_path = path
             self.lib_path = os.path.dirname(path)
 
-    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /app/calibre-web-automated/empty_library/app.db and sets the permissions
+    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /opt/cwa/empty_library/app.db and sets the permissions
     def check_for_app_db(self):
         files_in_config = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.config_dir) for f in filenames]
         db_files = [f for f in files_in_config if "app.db" in f]
         if len(db_files) == 0:
-            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /app/calibre-web-automated/empty_library/app.db")
+            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /opt/cwa/empty_library/app.db")
             shutil.copyfile(self.empty_appdb, f"{self.config_dir}/app.db")
-            os.system(f"chown -R abc:abc {self.config_dir}")
             print(f"[cwa-auto-library] app.db successfully copied to {self.config_dir}")
         else:
             return
@@ -74,7 +73,7 @@ class AutoLibrary:
             index_of_biggest_db = max(range(len(db_sizes)), key=db_sizes.__getitem__)
             self.metadb_path = db_files[index_of_biggest_db]
             print(f"\n[cwa-auto-library]: Automatically mounting the largest database using the following db file - {db_files[index_of_biggest_db]} ...")
-            print("\n[cwa-auto-library]: If this is unwanted, please ensure only 1 metadata.db file / only your desired Calibre Database exists in '/calibre-library', then restart the container")
+            print("\n[cwa-auto-library]: If this is unwanted, please ensure only 1 metadata.db file / only your desired Calibre Database exists in '/opt/calibre-web', then restart the container")
             return True
         else:
             return False
@@ -123,11 +122,10 @@ class AutoLibrary:
             print(e)
             sys.exit(1)
 
-    # Uses the empty metadata.db in /app/calibre-web-automated to create a new library
+    # Uses the empty metadata.db in /opt/cwa to create a new library
     def make_new_library(self):
         print("[cwa-auto-library]: No existing library found. Creating new library...")
         shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
-        os.system(f"chown -R abc:abc {self.library_dir}")
         self.metadb_path = f"{self.library_dir}/metadata.db"
         return
 
