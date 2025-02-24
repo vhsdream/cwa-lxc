@@ -31,7 +31,7 @@ from datetime import datetime
 import os.path
 
 import sys
-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
+sys.path.insert(1, '/opt/cwa/scripts/')
 from cwa_db import CWA_DB
 
 
