@@ -53,7 +53,7 @@ DIRS_JSON = "/opt/cwa/dirs.json"
 @switch_theme.route("/cwa-switch-theme", methods=["GET", "POST"])
 @login_required_if_no_ano
 def cwa_switch_theme():
-    con = sqlite3.connect("/var/lib/cwa/app.db")
+    con = sqlite3.connect("/root/.calibre-web/app.db")
     cur = con.cursor()
     current_theme = cur.execute('SELECT config_theme FROM settings;').fetchone()[0]
 
