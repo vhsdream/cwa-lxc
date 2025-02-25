@@ -23,7 +23,7 @@ class AutoLibrary:
         self.config_dir = "/var/lib/cwa"
         self.library_dir = "/opt/calibre-web"
         self.dirs_path = "/opt/cwa/dirs.json"
-        self.app_db = "/var/lib/cwa/app.db"
+        self.app_db = "/root/.calibre-web/app.db"
 
         self.empty_appdb = "/opt/cwa/empty_library/app.db"
         self.empty_metadb = "/opt/cwa/empty_library/metadata.db"
