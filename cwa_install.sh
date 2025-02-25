@@ -103,3 +103,7 @@ WantedBy=multi-user.target
 EOF
 # Then, maybe after all that is done, we restart the Calibre-web service
 systemctl start cps
+# Then enable the other services
+systemctl enable --now cwa-autolibrary cwa-ingester cwa-change-detector
+
+# then cleanup etc etc
