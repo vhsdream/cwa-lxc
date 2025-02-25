@@ -26,10 +26,11 @@ apt-get install -y --no-install-recommends \
 
 # get CWA release
 cd /opt
-RELEASE=$(curl -s https://api.github.com/repos/vhsdream/cwa-lxc/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-wget -q "https://github.com/vhsdream/cwa-lxc/archive/refs/tags/V${RELEASE}.zip"
-unzip -q V${RELEASE}.zip
-mv Calibre-Web-Automated-${RELEASE} /opt/cwa
+# RELEASE=$(curl -s https://api.github.com/repos/vhsdream/cwa-lxc/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
+# wget -q "https://github.com/vhsdream/cwa-lxc/archive/refs/tags/V${RELEASE}.zip"
+wget -q "https://github.com/vhsdream/cwa-lxc/archive/refs/heads/dev.zip"
+unzip -q dev.zip
+mv cwa-lxc-dev /opt/cwa
 cd /opt/cwa
 
 # creating dirs, according to setup-cwa.sh and the cwa-init s6 script (with some changes for compatibility)
