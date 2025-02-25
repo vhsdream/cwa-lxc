@@ -1,15 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-# Print promt title
+# Print prompt title
 echo "====== Calibre-Web Automated -- Status of Monitoring Services ======"
 echo ""
 
+INGESTER_STATUS=$(systemctl is-active cwa-ingester)
+METACHANGE_STATUS=$(systemctl is-active cwa-change-detector)
 
-if s6-rc -a list | grep -q 'cwa-ingest-service'; then
+if [ "$INGESTER_STATUS" = "active" ] ; then
     echo -e "- cwa-ingest-service ${GREEN}is running${NC}"
     is=true
 else
@@ -17,7 +19,7 @@ else
     is=false
 fi
 
-if s6-rc -a list | grep -q 'metadata-change-detector'; then
+if [ "$METACHANGE_STATUS" = "active" ]; then
     echo -e "- metadata-change-detector ${GREEN}is running${NC}"
     mc=true
 else
