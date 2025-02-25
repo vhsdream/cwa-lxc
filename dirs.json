@@ -1,5 +1,5 @@
 {
-    "ingest_folder":"/opt/cwa-book-ingest",
-    "calibre_library_dir":"/opt/calibre-web",
-    "tmp_conversion_dir":"/var/lib/cwa/.cwa_conversion_tmp"
+    "ingest_folder": "/opt/cwa-book-ingest",
+    "calibre_library_dir": "/opt/calibre-web",
+    "tmp_conversion_dir": "/var/lib/cwa/.cwa_conversion_tmp"
 }

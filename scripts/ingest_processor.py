@@ -258,7 +258,6 @@ def main(filepath=sys.argv[1]):
                 print(f"[ingest-processor]: Cannot convert {nbp.filepath}. {nbp.input_format} is currently unsupported / is not a known ebook format.", flush=True)
 
         nbp.empty_tmp_con_dir()
-        nbp.set_library_permissions()
         nbp.delete_current_file()
         del nbp # New in Version 2.0.0, should drastically reduce memory usage with large ingests
 
