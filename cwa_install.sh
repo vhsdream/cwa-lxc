@@ -50,5 +50,56 @@ cp -r /opt/cwa/root/app/calibre-web/cps/* /usr/local/lib/python3.11/dist-package
 
 # At this point I think a number of systemd service files need to be created for the various CWA workers. It is a TODO.
 #
+
+cat <<EOF >/etc/systemd/system/cwa-autolibrary.service
+[Unit]
+Description=Calibre-Web Automated Auto-Library Service
+After=network.target cps.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cwa
+ExecStart=/usr/bin/python3 /opt/cwa/scripts/auto_library.py
+TimeoutStopSec=10
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat <<EOF >/etc/systemd/system/cwa-ingester.service
+[Unit]
+Description=Calibre-Web Automated Ingest Service
+After=network.target cps.service cwa-autolibrary.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cwa
+ExecStart=/usr/bin/python3 /opt/cwa/scripts/ingest_processor.py
+TimeoutStopSec=10
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat <<EOF >/etc/systemd/system/cwa-change-detector.service
+[Unit]
+Description=Calibre-Web Automated Metadata Change Detector Service
+After=network.target cps.service cwa-autolibrary.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cwa
+ExecStart=/usr/bin/bash -c /opt/cwa/scripts/change-detector.sh
+TimeoutStopSec=10
+KillMode=process
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
 # Then, maybe after all that is done, we restart the Calibre-web service
 systemctl start cps
