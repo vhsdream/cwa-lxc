@@ -76,7 +76,7 @@ After=network.target cps.service cwa-autolibrary.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/cwa
-ExecStart=/usr/bin/python3 /opt/cwa/scripts/ingest_processor.py
+ExecStart=/usr/bin/bash -c /opt/cwa/scripts/ingest-service.sh
 TimeoutStopSec=10
 KillMode=process
 Restart=on-failure
