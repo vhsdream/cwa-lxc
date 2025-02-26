@@ -38,17 +38,25 @@ apt-get install -y --no-install-recommends \
 
 echo "Dependencies installed." && sleep 2
 # get CWA fork with modified scripts
-echo "Downloading CWA from fork..." && sleep 1
+echo "Cloning Calibre-Web Automated & switching to latest release branch..." && sleep 1
 cd /opt
-wget -q "https://github.com/vhsdream/cwa-lxc/archive/refs/heads/dev.zip"
-unzip -q dev.zip
-mv cwa-lxc-dev /opt/cwa
+RELEASE=$(curl -s https://api.github.com/repos/crocodilestick/Calibre-Web-Automated/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
+git clone https://github.com/crocodilestick/Calibre-Web-Automated.git /opt/cwa --single-branch &>/dev/null
+git checkout V${RELEASE} &>/dev/null
 cd /opt/cwa
+echo "Repo ready." && sleep 1
 
 # install additional reqs for CWA
 echo "Installing Python requirements for CWA..." && sleep 1
-pip install -r requirements.txt -q
+pip install -r requirements.txt -qqq
 echo "Installed." && sleep 2
+
+# Install git patch file
+echo "Applying git patch for Proxmox LXC compatibility..." && sleep 1
+# Patch will likely need to be downloaded from somewhere
+# wget -q https://github-location-of-patch.patch
+wget -q https://raw.githubusercontent.com/vhsdream/cwa-lxc/refs/heads/git-patch/proxmox-lxc.patch -O /opt/proxmox-lxc.patch
+git apply /opt/proxmox-lxc.patch &>/dev/null
 
 # creating dirs, according to setup-cwa.sh and the cwa-init s6 script (with some changes for compatibility)
 echo "Creating required directories for CWA..." && sleep 1
@@ -131,10 +139,11 @@ echo "Service files created." && sleep 1
 
 # Enable CWA Service target
 echo "Enabling & starting services via cwa.target..." && sleep 1
+systemctl daemon-reload
 systemctl enable -q --now cwa.target
 echo "CWA started! (hopefully)" && sleep 1
 
 # then cleanup etc etc
 echo "Cleaning up..." && sleep 1
-apt autoremove && apt autoclean
+apt autoremove - y &>/dev/null && apt autoclean -y &>/dev/null
 echo "Done!"
