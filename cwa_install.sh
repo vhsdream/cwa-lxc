@@ -67,6 +67,7 @@ mkdir -p /var/lib/cwa/processed_books/failed
 mkdir -p /var/lib/cwa/processed_books/fixed_originals
 mkdir -p /var/lib/cwa/log_archive
 mkdir -p /var/lib/cwa/.cwa_conversion_tmp
+touch /var/lib/cwa/convert-library.log # fixes https://github.com/vhsdream/cwa-lxc/issues/1
 # the 'calibre-library' is simply the /opt/calibre-web dir so no need to change
  
 # copy modified calibre-web files from CWA
