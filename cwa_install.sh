@@ -42,8 +42,8 @@ echo "Cloning Calibre-Web Automated & switching to latest release branch..." && 
 cd /opt
 RELEASE=$(curl -s https://api.github.com/repos/crocodilestick/Calibre-Web-Automated/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
 git clone https://github.com/crocodilestick/Calibre-Web-Automated.git /opt/cwa --single-branch &>/dev/null
-git checkout V${RELEASE} &>/dev/null
 cd /opt/cwa
+git checkout V${RELEASE} &>/dev/null
 echo "Repo ready." && sleep 1
 
 # install additional reqs for CWA
