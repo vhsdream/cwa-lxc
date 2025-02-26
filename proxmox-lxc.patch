@@ -1,0 +1,767 @@
+diff --git a/cwa_install.sh b/cwa_install.sh
+new file mode 100644
+index 0000000..bc977ad
+--- /dev/null
++++ b/cwa_install.sh
+@@ -0,0 +1,140 @@
++#! /usr/bin/env bash
++
++# Dirty install script for Calibre-Web Automated
++# Done over top of a Calibre-Web install via Proxmox Helper Script
++# https://github.com/community-scripts/ProxmoxVE/blob/main/install/calibre-web-install.sh
++# Author: vhsdream 2025
++# USE AT YOUR OWN RISK
++# AFTER RUNNING THIS SCRIPT IT'S LIKELY YOU CAN NO LONGER USE THE 'update' FUNCTION
++# FROM Proxmox Helper Scripts
++
++set -euo pipefail
++
++# give warning
++echo "This script only works if Calibre-Web was installed with the Proxmox Helper Script" && sleep 3
++echo "If it succeeds, you can no longer use the 'update' function from Proxmox Helper Scripts" && sleep 3
++echo "Run this script at your own risk. I TAKE NO RESPONSIBILITY FOR DATA LOSS!" && sleep 3
++echo "You have 5 seconds to cancel before the script proceeds..." && sleep 6
++
++# stop Calibre-web
++echo "Stopping Calibre-Web service & installing CWA dependencies..." && sleep 1
++systemctl disable -q --now cps
++apt-get update && \
++apt-get install -y --no-install-recommends \
++  build-essential \
++  git \
++  libldap2-dev \
++  libsasl2-dev \
++  ghostscript \
++  libldap-2.5-0 \
++  libmagic1 \
++  libsasl2-2 \
++  libxi6 \
++  libxslt1.1 \
++  python3-venv \
++  xdg-utils \
++  inotify-tools \
++  sqlite3 \
++
++echo "Dependencies installed." && sleep 2
++# get CWA fork with modified scripts
++echo "Downloading CWA from fork..." && sleep 1
++cd /opt
++wget -q "https://github.com/vhsdream/cwa-lxc/archive/refs/heads/dev.zip"
++unzip -q dev.zip
++mv cwa-lxc-dev /opt/cwa
++cd /opt/cwa
++
++# install additional reqs for CWA
++echo "Installing Python requirements for CWA..." && sleep 1
++pip install -r requirements.txt -q
++echo "Installed." && sleep 2
++
++# creating dirs, according to setup-cwa.sh and the cwa-init s6 script (with some changes for compatibility)
++echo "Creating required directories for CWA..." && sleep 1
++mkdir -p /opt/cwa/metadata_change_logs /opt/cwa/metadata_temp /opt/cwa-book-ingest
++mkdir -p /var/lib/cwa/processed_books/converted
++mkdir -p /var/lib/cwa/processed_books/imported
++mkdir -p /var/lib/cwa/processed_books/failed
++mkdir -p /var/lib/cwa/processed_books/fixed_originals
++mkdir -p /var/lib/cwa/log_archive
++mkdir -p /var/lib/cwa/.cwa_conversion_tmp
++# the 'calibre-library' is simply the /opt/calibre-web dir so no need to change
++ 
++# copy modified calibre-web files from CWA
++echo "Copying patched Calibre-Web files to local Python lib folder..." && sleep 1
++cp -r /opt/cwa/root/app/calibre-web/cps/* /usr/local/lib/python3.11/dist-packages/calibreweb/cps
++
++# Create service files for CWA workers
++echo "Creating CWA worker service files..." && sleep 1
++cat <<EOF >/etc/systemd/system/cwa-autolibrary.service
++[Unit]
++Description=Calibre-Web Automated Auto-Library Service
++After=network.target cps.service
++
++[Service]
++Type=simple
++WorkingDirectory=/opt/cwa
++ExecStart=/usr/bin/python3 /opt/cwa/scripts/auto_library.py
++TimeoutStopSec=10
++KillMode=process
++Restart=on-failure
++
++[Install]
++WantedBy=multi-user.target
++EOF
++
++cat <<EOF >/etc/systemd/system/cwa-ingester.service
++[Unit]
++Description=Calibre-Web Automated Ingest Service
++After=network.target cps.service cwa-autolibrary.service
++
++[Service]
++Type=simple
++WorkingDirectory=/opt/cwa
++ExecStart=/usr/bin/bash -c /opt/cwa/scripts/ingest-service.sh
++TimeoutStopSec=10
++KillMode=process
++Restart=on-failure
++
++[Install]
++WantedBy=multi-user.target
++EOF
++
++cat <<EOF >/etc/systemd/system/cwa-change-detector.service
++[Unit]
++Description=Calibre-Web Automated Metadata Change Detector Service
++After=network.target cps.service cwa-autolibrary.service
++
++[Service]
++Type=simple
++WorkingDirectory=/opt/cwa
++ExecStart=/usr/bin/bash -c /opt/cwa/scripts/change-detector.sh
++TimeoutStopSec=10
++KillMode=process
++Restart=on-failure
++
++[Install]
++WantedBy=multi-user.target
++EOF
++
++cat <<EOF >/etc/systemd/system/cwa.target
++[Unit]
++Description=Calibre-Web Automated Services
++After=network-online.target
++Wants=cps.service cwa-autolibrary.service cwa-ingester.service cwa-change-detector.service
++
++[Install]
++WantedBy=multi-user.target
++EOF
++echo "Service files created." && sleep 1
++
++# Enable CWA Service target
++echo "Enabling & starting services via cwa.target..." && sleep 1
++systemctl enable -q --now cwa.target
++echo "CWA started! (hopefully)" && sleep 1
++
++# then cleanup etc etc
++echo "Cleaning up..." && sleep 1
++apt autoremove && apt autoclean
++echo "Done!"
+diff --git a/dirs.json b/dirs.json
+index 3b81acd..9fd2e8e 100644
+--- a/dirs.json
++++ b/dirs.json
+@@ -1,5 +1,5 @@
+ {
+-    "ingest_folder":"/cwa-book-ingest",
+-    "calibre_library_dir":"/calibre-library",
+-    "tmp_conversion_dir":"/config/.cwa_conversion_tmp"
+-}
+\ No newline at end of file
++    "ingest_folder": "/opt/cwa-book-ingest",
++    "calibre_library_dir": "/opt/calibre-web",
++    "tmp_conversion_dir": "/var/lib/cwa/.cwa_conversion_tmp"
++}
+diff --git a/root/app/calibre-web/cps/cwa_functions.py b/root/app/calibre-web/cps/cwa_functions.py
+index e2428f7..7bbc4e4 100644
+--- a/root/app/calibre-web/cps/cwa_functions.py
++++ b/root/app/calibre-web/cps/cwa_functions.py
+@@ -24,7 +24,7 @@ from werkzeug.utils import secure_filename
+ from .web import cwa_get_num_books_in_library
+ 
+ import sys
+-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
++sys.path.insert(1, '/opt/cwa/scripts/')
+ from cwa_db import CWA_DB
+ 
+ switch_theme = Blueprint('switch_theme', __name__)
+@@ -39,8 +39,8 @@ cwa_logs = Blueprint('cwa_logs', __name__)
+ ##——————————————————————————————GLOBAL VARIABLES——————————————————————————————##
+ 
+ # Folder where the log files are stored
+-LOG_ARCHIVE = "/config/log_archive"
+-DIRS_JSON = "/app/calibre-web-automated/dirs.json"
++LOG_ARCHIVE = "/var/lib/cwa/log_archive"
++DIRS_JSON = "/opt/cwa/dirs.json"
+ 
+ ##———————————————————————————END OF GLOBAL VARIABLES——————————————————————————##
+ 
+@@ -53,7 +53,7 @@ DIRS_JSON = "/app/calibre-web-automated/dirs.json"
+ @switch_theme.route("/cwa-switch-theme", methods=["GET", "POST"])
+ @login_required_if_no_ano
+ def cwa_switch_theme():
+-    con = sqlite3.connect("/config/app.db")
++    con = sqlite3.connect("/root/.calibre-web/app.db")
+     cur = con.cursor()
+     current_theme = cur.execute('SELECT config_theme FROM settings;').fetchone()[0]
+ 
+@@ -89,7 +89,7 @@ def get_ingest_dir():
+ def refresh_library(app):
+     with app.app_context():  # Create app context for session
+         ingest_dir = get_ingest_dir()
+-        result = subprocess.run(['python3', '/app/calibre-web-automated/scripts/ingest_processor.py', ingest_dir])
++        result = subprocess.run(['python3', '/opt/cwa/scripts/ingest_processor.py', ingest_dir])
+         return_code = result.returncode
+ 
+         # Add empty list for messages in app context if a list doesn't already exist
+@@ -211,7 +211,7 @@ def set_cwa_settings():
+                 result['auto_ingest_ignored_formats'].remove(result['auto_convert_target_format'])
+ 
+             # DEBUGGING
+-            # with open("/config/post_request" ,"w") as f:
++            # with open("/var/lib/cwa/post_request" ,"w") as f:
+             #     for key in result.keys():
+             #         if key == "auto_convert_ignored_formats" or key == "auto_ingest_ignored_formats":
+             #             f.write(f"{key} - {', '.join(result[key])}\n")
+@@ -352,7 +352,7 @@ def show_full_epub_fixer_with_paths_fixes():
+ @login_required_if_no_ano
+ @admin_required
+ def cwa_flash_status():
+-    result = subprocess.run(['/app/calibre-web-automated/scripts/check-cwa-services.sh'])
++    result = subprocess.run(['/opt/cwa/scripts/check-cwa-services.sh'])
+     services_status = result.returncode
+ 
+     match services_status:
+@@ -474,11 +474,11 @@ def get_log_dates(logs) -> dict[str,str]:
+ ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
+ 
+ def convert_library_start(queue):
+-    cl_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/convert_library.py'])
++    cl_process = subprocess.Popen(['python3', '/opt/cwa/scripts/convert_library.py'])
+     queue.put(cl_process)
+ 
+ def get_tmp_conversion_dir() -> str:
+-    dirs_json_path = "/app/calibre-web-automated/dirs.json"
++    dirs_json_path = "/opt/cwa/dirs.json"
+     dirs = {}
+     with open(dirs_json_path, 'r') as f:
+         dirs: dict[str, str] = json.load(f)
+@@ -497,7 +497,7 @@ def empty_tmp_con_dir(tmp_conversion_dir) -> None:
+         print(f"[cwa-functions]: An error occurred while emptying {tmp_conversion_dir}. See the following error: {e}")
+ 
+ def is_convert_library_finished() -> bool:
+-    log_path = "/config/convert-library.log"
++    log_path = "/var/lib/cwa/convert-library.log"
+     with open(log_path, 'r') as log:
+         if "CWA Convert Library Service - Run Ended: " in log.read():
+             return True
+@@ -506,7 +506,7 @@ def is_convert_library_finished() -> bool:
+ 
+ def kill_convert_library(queue):
+     trigger_file = Path(tempfile.gettempdir() + "/.kill_convert_library_trigger")
+-    log_path = "/config/convert-library.log"
++    log_path = "/var/lib/cwa/convert-library.log"
+     while True:
+         sleep(0.05) # Required to prevent high cpu usage
+         if trigger_file.exists():
+@@ -576,7 +576,7 @@ def download_current_log(log_filename):
+ @convert_library.route('/cwa-convert-library-start', methods=["GET"])
+ def start_conversion():
+     # Wipe conversion log from previous runs
+-    open('/config/convert-library.log', 'w').close()
++    open('/var/lib/cwa/convert-library.log', 'w').close()
+     # Remove any left over kill file
+     try:
+         os.remove(tempfile.gettempdir() + "/.kill_convert_library_trigger")
+@@ -600,7 +600,7 @@ def cancel_convert_library():
+ 
+ @convert_library.route('/convert-library-status', methods=["GET"])
+ def get_status():
+-    with open("/config/convert-library.log", 'r') as f:
++    with open("/var/lib/cwa/convert-library.log", 'r') as f:
+         status = f.read()
+     progress = extract_progress(status)
+     statusList = {'status':status,
+@@ -615,11 +615,11 @@ def get_status():
+ ##————————————————————————————————————————————————————————————————————————————##
+ 
+ def epub_fixer_start(queue):
+-    ef_process = subprocess.Popen(['python3', '/app/calibre-web-automated/scripts/kindle_epub_fixer.py', '--all'])
++    ef_process = subprocess.Popen(['python3', '/opt/cwa/scripts/kindle_epub_fixer.py', '--all'])
+     queue.put(ef_process)
+ 
+ def is_epub_fixer_finished() -> bool:
+-    log_path = "/config/epub-fixer.log"
++    log_path = "/var/lib/cwa/epub-fixer.log"
+     with open(log_path, 'r') as log:
+         if "CWA Kindle EPUB Fixer Service - Run Ended: " in log.read():
+             return True
+@@ -628,7 +628,7 @@ def is_epub_fixer_finished() -> bool:
+ 
+ def kill_epub_fixer(queue):
+     trigger_file = Path(tempfile.gettempdir() + "/.kill_epub_fixer_trigger")
+-    log_path = "/config/epub-fixer.log"
++    log_path = "/var/lib/cwa/epub-fixer.log"
+     while True:
+         sleep(0.05) # Required to prevent high cpu usage
+         if trigger_file.exists():
+@@ -695,7 +695,7 @@ def download_current_log(log_filename):
+ @epub_fixer.route('/cwa-epub-fixer-start', methods=["GET"])
+ def start_epub_fixer():
+     # Wipe conversion log from previous runs
+-    open('/config/epub-fixer.log', 'w').close()
++    open('/var/lib/cwa/epub-fixer.log', 'w').close()
+     # Remove any left over kill file
+     try:
+         os.remove(tempfile.gettempdir() + "/.kill_epub_fixer_trigger")
+@@ -719,7 +719,7 @@ def cancel_epub_fixer():
+ 
+ @epub_fixer.route('/epub-fixer-status', methods=["GET"])
+ def get_status():
+-    with open("/config/epub-fixer.log", 'r') as f:
++    with open("/var/lib/cwa/epub-fixer.log", 'r') as f:
+         status = f.read()
+     progress = extract_progress(status)
+     statusList = {'status':status,
+diff --git a/root/app/calibre-web/cps/editbooks.py b/root/app/calibre-web/cps/editbooks.py
+index 08a0576..914a008 100644
+--- a/root/app/calibre-web/cps/editbooks.py
++++ b/root/app/calibre-web/cps/editbooks.py
+@@ -1333,7 +1333,7 @@ def edit_cc_data(book_id, book, to_save, cc):
+                                                   'custom')
+     # CWA Export of changed Metadata
+     now = datetime.now()
+-    with open(f'/app/calibre-web-automated/metadata_change_logs/{now.strftime("%Y%m%d%H%M%S")}-{book_id}.json', 'w') as f:
++    with open(f'/opt/cwa/metadata_change_logs/{now.strftime("%Y%m%d%H%M%S")}-{book_id}.json', 'w') as f:
+         json.dump(to_save, f, indent=4)
+     return changed
+ 
+diff --git a/root/app/calibre-web/cps/render_template.py b/root/app/calibre-web/cps/render_template.py
+index 23a3d86..36d4f6b 100644
+--- a/root/app/calibre-web/cps/render_template.py
++++ b/root/app/calibre-web/cps/render_template.py
+@@ -31,7 +31,7 @@ from datetime import datetime
+ import os.path
+ 
+ import sys
+-sys.path.insert(1, '/app/calibre-web-automated/scripts/')
++sys.path.insert(1, '/opt/cwa/scripts/')
+ from cwa_db import CWA_DB
+ 
+ 
+diff --git a/scripts/auto_library.py b/scripts/auto_library.py
+index 6d34be5..c7d4b5f 100644
+--- a/scripts/auto_library.py
++++ b/scripts/auto_library.py
+@@ -20,13 +20,13 @@ def main():
+ 
+ class AutoLibrary:
+     def __init__(self):
+-        self.config_dir = "/config"
+-        self.library_dir = "/calibre-library"
+-        self.dirs_path = "/app/calibre-web-automated/dirs.json"
+-        self.app_db = "/config/app.db"
++        self.config_dir = "/var/lib/cwa"
++        self.library_dir = "/opt/calibre-web"
++        self.dirs_path = "/opt/cwa/dirs.json"
++        self.app_db = "/root/.calibre-web/app.db"
+ 
+-        self.empty_appdb = "/app/calibre-web-automated/empty_library/app.db"
+-        self.empty_metadb = "/app/calibre-web-automated/empty_library/metadata.db"
++        self.empty_appdb = "/opt/cwa/empty_library/app.db"
++        self.empty_metadb = "/opt/cwa/empty_library/metadata.db"
+ 
+         self.metadb_path = None
+         self.lib_path = None
+@@ -44,14 +44,13 @@ class AutoLibrary:
+             self._metadb_path = path
+             self.lib_path = os.path.dirname(path)
+ 
+-    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /app/calibre-web-automated/empty_library/app.db and sets the permissions
++    # Checks config_dir for an existing app.db, if one doesn't already exist it copies an empty one from /opt/cwa/empty_library/app.db and sets the permissions
+     def check_for_app_db(self):
+         files_in_config = [os.path.join(dirpath,f) for (dirpath, dirnames, filenames) in os.walk(self.config_dir) for f in filenames]
+         db_files = [f for f in files_in_config if "app.db" in f]
+         if len(db_files) == 0:
+-            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /app/calibre-web-automated/empty_library/app.db")
++            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /opt/cwa/empty_library/app.db")
+             shutil.copyfile(self.empty_appdb, f"{self.config_dir}/app.db")
+-            os.system(f"chown -R abc:abc {self.config_dir}")
+             print(f"[cwa-auto-library] app.db successfully copied to {self.config_dir}")
+         else:
+             return
+@@ -74,7 +73,7 @@ class AutoLibrary:
+             index_of_biggest_db = max(range(len(db_sizes)), key=db_sizes.__getitem__)
+             self.metadb_path = db_files[index_of_biggest_db]
+             print(f"\n[cwa-auto-library]: Automatically mounting the largest database using the following db file - {db_files[index_of_biggest_db]} ...")
+-            print("\n[cwa-auto-library]: If this is unwanted, please ensure only 1 metadata.db file / only your desired Calibre Database exists in '/calibre-library', then restart the container")
++            print("\n[cwa-auto-library]: If this is unwanted, please ensure only 1 metadata.db file / only your desired Calibre Database exists in '/opt/calibre-web', then restart the container")
+             return True
+         else:
+             return False
+@@ -123,14 +122,13 @@ class AutoLibrary:
+             print(e)
+             sys.exit(1)
+ 
+-    # Uses the empty metadata.db in /app/calibre-web-automated to create a new library
++    # Uses the empty metadata.db in /opt/cwa to create a new library
+     def make_new_library(self):
+         print("[cwa-auto-library]: No existing library found. Creating new library...")
+         shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
+-        os.system(f"chown -R abc:abc {self.library_dir}")
+         self.metadb_path = f"{self.library_dir}/metadata.db"
+         return
+ 
+ 
+ if __name__ == '__main__':
+-    main()
+\ No newline at end of file
++    main()
+diff --git a/scripts/auto_zip.py b/scripts/auto_zip.py
+index 00c7622..2973146 100644
+--- a/scripts/auto_zip.py
++++ b/scripts/auto_zip.py
+@@ -9,7 +9,7 @@ from cwa_db import CWA_DB
+ 
+ class AutoZipper:
+     def __init__(self):
+-        self.archive_dirs_stem = "/config/processed_books/"
++        self.archive_dirs_stem = "/var/lib/cwa/processed_books/"
+         self.converted_dir = self.archive_dirs_stem + "converted/"
+         self.failed_dir = self.archive_dirs_stem + "failed/"
+         self.imported_dir = self.archive_dirs_stem + "imported/"
+@@ -103,4 +103,4 @@ def main():
+ 
+ 
+ if __name__ == "__main__":
+-    main()
+\ No newline at end of file
++    main()
+diff --git a/scripts/change-detector.sh b/scripts/change-detector.sh
+new file mode 100755
+index 0000000..218330a
+--- /dev/null
++++ b/scripts/change-detector.sh
+@@ -0,0 +1,14 @@
++#!/usr/bin/env bash
++
++echo "========== STARTING METADATA CHANGE DETECTOR ==========="
++
++# Folder to monitor
++WATCH_FOLDER="/opt/cwa/metadata_change_logs"
++echo "[metadata-change-detector] Watching folder: $WATCH_FOLDER"
++
++# Monitor the folder for new files
++inotifywait -m -e close_write -e moved_to --exclude '^.*\.(swp)$' "$WATCH_FOLDER" |
++while read -r directory events filename; do
++        echo "[metadata-change-detector] New file detected: $filename"
++        python3 /opt/cwa/scripts/cover_enforcer.py "--log" "$filename"
++done
+diff --git a/scripts/check-cwa-services.sh b/scripts/check-cwa-services.sh
+old mode 100644
+new mode 100755
+index b2c87f4..cb0d8f7
+--- a/scripts/check-cwa-services.sh
++++ b/scripts/check-cwa-services.sh
+@@ -1,15 +1,17 @@
+-#!/bin/bash
++#!/usr/bin/env bash
+ 
+ RED='\033[0;31m'
+ GREEN='\033[0;32m'
+ NC='\033[0m' # No Color
+ 
+-# Print promt title
++# Print prompt title
+ echo "====== Calibre-Web Automated -- Status of Monitoring Services ======"
+ echo ""
+ 
++INGESTER_STATUS=$(systemctl is-active cwa-ingester)
++METACHANGE_STATUS=$(systemctl is-active cwa-change-detector)
+ 
+-if s6-rc -a list | grep -q 'cwa-ingest-service'; then
++if [ "$INGESTER_STATUS" = "active" ] ; then
+     echo -e "- cwa-ingest-service ${GREEN}is running${NC}"
+     is=true
+ else
+@@ -17,7 +19,7 @@ else
+     is=false
+ fi
+ 
+-if s6-rc -a list | grep -q 'metadata-change-detector'; then
++if [ "$METACHANGE_STATUS" = "active" ]; then
+     echo -e "- metadata-change-detector ${GREEN}is running${NC}"
+     mc=true
+ else
+@@ -39,4 +41,4 @@ else
+     else
+         exit 3
+     fi
+-fi
+\ No newline at end of file
++fi
+diff --git a/scripts/convert_library.py b/scripts/convert_library.py
+index 0d65c87..38f1cf0 100644
+--- a/scripts/convert_library.py
++++ b/scripts/convert_library.py
+@@ -18,7 +18,7 @@ from cwa_db import CWA_DB
+ from kindle_epub_fixer import EPUBFixer
+ 
+ ### Global Variables
+-convert_library_log_file = "/config/convert-library.log"
++convert_library_log_file = "/var/lib/cwa/convert-library.log"
+ 
+ # Define the logger
+ logger = logging.getLogger(__name__)
+@@ -32,17 +32,6 @@ file_handler.setFormatter(formatter)
+ # Add the handler to the logger
+ logger.addHandler(file_handler)
+ 
+-# Define user and group
+-USER_NAME = "abc"
+-GROUP_NAME = "abc"
+-
+-# Get UID and GID
+-uid = pwd.getpwnam(USER_NAME).pw_uid
+-gid = grp.getgrnam(GROUP_NAME).gr_gid
+-
+-# Set permissions for log file
+-os.chown(convert_library_log_file, uid, gid)
+-
+ def print_and_log(string) -> None:
+     """ Ensures the provided string is passed to STDOUT and stored in the runs log file """
+     logger.info(string)
+@@ -72,7 +61,7 @@ atexit.register(removeLock)
+ 
+ backup_destinations = {
+         entry.name: entry.path
+-        for entry in os.scandir("/config/processed_books")
++        for entry in os.scandir("/var/lib/cwa/processed_books")
+         if entry.is_dir()
+     }
+ 
+@@ -92,7 +81,7 @@ class LibraryConverter:
+         self.hierarchy_of_success = {'epub', 'lit', 'mobi', 'azw', 'azw3', 'fb2', 'fbz', 'azw4', 'prc', 'odt', 'lrf', 'pdb',  'cbz', 'pml', 'rb', 'cbr', 'cb7', 'cbc', 'chm', 'djvu', 'snb', 'tcr', 'pdf', 'docx', 'rtf', 'html', 'htmlz', 'txtz', 'txt'}
+ 
+         self.current_book = 1
+-        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs('/app/calibre-web-automated/dirs.json') 
++        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs('/opt/cwa/dirs.json') 
+         self.to_convert = self.get_books_to_convert()
+ 
+ 
+@@ -319,15 +308,6 @@ class LibraryConverter:
+         except OSError:
+             print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) An error occurred while emptying {self.tmp_conversion_dir}.")
+ 
+-
+-    def set_library_permissions(self):
+-        try:
+-            subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
+-            print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Successfully set ownership of new files in {self.library_dir} to abc:abc.")
+-        except subprocess.CalledProcessError as e:
+-            print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}")
+-
+-
+ def main():
+     parser = argparse.ArgumentParser(
+         prog='convert-library',
+@@ -352,4 +332,4 @@ def main():
+ 
+ 
+ if __name__ == "__main__":
+-    main()
+\ No newline at end of file
++    main()
+diff --git a/scripts/cover_enforcer.py b/scripts/cover_enforcer.py
+index 60fb80a..df6fa48 100644
+--- a/scripts/cover_enforcer.py
++++ b/scripts/cover_enforcer.py
+@@ -13,9 +13,9 @@ import atexit
+ from cwa_db import CWA_DB
+ 
+ # Global Variables
+-dirs_json = "/app/calibre-web-automated/dirs.json"
+-change_logs_dir = "/app/calibre-web-automated/metadata_change_logs"
+-metadata_temp_dir = "/app/calibre-web-automated/metadata_temp"
++dirs_json = "/opt/cwa/dirs.json"
++change_logs_dir = "/opt/cwa/metadata_change_logs"
++metadata_temp_dir = "/opt/cwa/metadata_temp"
+ 
+ 
+ # Creates a lock file unless one already exists meaning an instance of the script is
+@@ -343,4 +343,4 @@ def main():
+     sys.exit(0)
+ 
+ if __name__ == "__main__":
+-    main()
+\ No newline at end of file
++    main()
+diff --git a/scripts/cwa_db.py b/scripts/cwa_db.py
+index c3182f4..670531e 100644
+--- a/scripts/cwa_db.py
++++ b/scripts/cwa_db.py
+@@ -12,10 +12,10 @@ class CWA_DB:
+         self.verbose = verbose
+ 
+         self.db_file = "cwa.db"
+-        self.db_path = "/config/"
++        self.db_path = "/var/lib/cwa/"
+         self.con, self.cur = self.connect_to_db() # type: ignore
+ 
+-        self.schema_path = "/app/calibre-web-automated/scripts/cwa_schema.sql"
++        self.schema_path = "/opt/cwa/scripts/cwa_schema.sql"
+         self.stats_tables = ["cwa_enforcement", "cwa_import", "cwa_conversions", "epub_fixes"]
+         self.tables, self.schema = self.make_tables()
+ 
+@@ -28,7 +28,7 @@ class CWA_DB:
+ 
+ 
+     def temp_disable_split_library(self): # Temporary measure to disable split library functionality until it can be supported in V2.2.0
+-        con = sqlite3.connect("/config/app.db")
++        con = sqlite3.connect("/root/.calibre-web/app.db")
+         cur = con.cursor()
+ 
+         current_split_setting = bool(cur.execute("SELECT config_calibre_split FROM settings").fetchone()[0])
+@@ -132,7 +132,7 @@ class CWA_DB:
+                 try:
+                     command = line.replace('\n', '').strip()
+                     command = command.replace(',', ';')
+-                    with open('/config/.cwa_db_debug', 'a') as f:
++                    with open('/var/lib/cwa/.cwa_db_debug', 'a') as f:
+                         f.write(command)
+                     self.cur.execute(f"ALTER TABLE cwa_settings ADD {command}")  
+                     self.con.commit()
+@@ -402,4 +402,4 @@ def main():
+ 
+ 
+ if __name__ == "__main__":
+-    main()
+\ No newline at end of file
++    main()
+diff --git a/scripts/ingest-service.sh b/scripts/ingest-service.sh
+new file mode 100755
+index 0000000..63c0b76
+--- /dev/null
++++ b/scripts/ingest-service.sh
+@@ -0,0 +1,36 @@
++#!/usr/bin/env bash
++
++# https://github.com/janeczku/calibre-web/wiki/Automatically-import-new-books-(Linux)
++
++# This script is used to automatically import downloaded ebooks into a Calibre database.
++# Reference: https://manual.calibre-ebook.com/generated/en/calibredb.html#add
++echo "========== STARTING CWA-INGEST SERVICE =========="
++
++WATCH_FOLDER=$(grep -o '"ingest_folder": "[^"]*' /opt/cwa/dirs.json | grep -o '[^"]*$')
++echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
++
++# Monitor the folder for new files
++inotifywait -m -r --format="%e %w%f" -e close_write -e moved_to "$WATCH_FOLDER" |
++while read -r events filepath ; do
++        # if [[ $(grep "$filepath" ingest-log-test.txt | egrep -o '[0-9]{10}') ]]; then
++        #         CURRENT_TIME=$(date +'%s')
++        #         TIME_OF_MATCH=$(grep "$filepath" ingest-log-test.txt | egrep -o '[0-9]{10}')
++        #         TODO NEED TO GET DIFFERENCE BETWEEN THE 2 TIMES AND IF LESS THAN 60 SECONDS, IGNORE
++        echo "[cwa-ingest-service] New files detected - $filepath - Starting Ingest Processor..."
++        python3 /opt/cwa/scripts/ingest_processor.py "$filepath" # &
++        # echo "'${filepath}' - $(date +'%s')" >> /config/.ingest_dupe_list
++        # INGEST_PROCESSOR_PID=$!
++        # Wait for the ingest processor to finish
++        # wait $INGEST_PROCESSOR_PID
++        # if ! [[ $(ls -A "$WATCH_FOLDER") ]]; then
++        #         FILES="${WATCH_FOLDER}/*"
++        #         for f in $FILES
++        #         do
++        #                 python3 /opt/cwa/scripts/ingest_processor.py "$f" &
++        #                 INGEST_PROCESSOR_PID=$!
++        #                 # Wait for the ingest processor to finish
++        #                 wait $INGEST_PROCESSOR_PID
++        #         done
++        # fi
++done
++
+diff --git a/scripts/ingest_processor.py b/scripts/ingest_processor.py
+index 1e04e98..7adba71 100644
+--- a/scripts/ingest_processor.py
++++ b/scripts/ingest_processor.py
+@@ -32,7 +32,7 @@ atexit.register(removeLock)
+ # Generates dictionary of available backup directories and their paths
+ backup_destinations = {
+         entry.name: entry.path
+-        for entry in os.scandir("/config/processed_books")
++        for entry in os.scandir("/var/lib/cwa/processed_books")
+         if entry.is_dir()
+     }
+ 
+@@ -49,7 +49,7 @@ class NewBookProcessor:
+ 
+         self.supported_book_formats = {'azw', 'azw3', 'azw4', 'cbz', 'cbr', 'cb7', 'cbc', 'chm', 'djvu', 'docx', 'epub', 'fb2', 'fbz', 'html', 'htmlz', 'lit', 'lrf', 'mobi', 'odt', 'pdf', 'prc', 'pdb', 'pml', 'rb', 'rtf', 'snb', 'tcr', 'txtz', 'txt', 'kepub'}
+         self.hierarchy_of_success = {'epub', 'lit', 'mobi', 'azw', 'epub', 'azw3', 'fb2', 'fbz', 'azw4',  'prc', 'odt', 'lrf', 'pdb',  'cbz', 'pml', 'rb', 'cbr', 'cb7', 'cbc', 'chm', 'djvu', 'snb', 'tcr', 'pdf', 'docx', 'rtf', 'html', 'htmlz', 'txtz', 'txt'}
+-        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs("/app/calibre-web-automated/dirs.json")
++        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs("/opt/cwa/dirs.json")
+ 
+         # Create the tmp_conversion_dir if it does not already exist
+         Path(self.tmp_conversion_dir).mkdir(exist_ok=True)
+@@ -216,13 +216,6 @@ class NewBookProcessor:
+         except OSError:
+             print(f"[ingest-processor] An error occurred while emptying {self.tmp_conversion_dir}.", flush=True)
+ 
+-    def set_library_permissions(self):
+-        try:
+-            subprocess.run(["chown", "-R", "abc:abc", self.library_dir], check=True)
+-        except subprocess.CalledProcessError as e:
+-            print(f"[ingest-processor] An error occurred while attempting to recursively set ownership of {self.library_dir} to abc:abc. See the following error:\n{e}", flush=True)
+-
+-
+ def main(filepath=sys.argv[1]):
+     """Checks if filepath is a directory. If it is, main will be ran on every file in the given directory
+     Inotifywait won't detect files inside folders if the folder was moved rather than copied"""
+@@ -265,7 +258,6 @@ def main(filepath=sys.argv[1]):
+                 print(f"[ingest-processor]: Cannot convert {nbp.filepath}. {nbp.input_format} is currently unsupported / is not a known ebook format.", flush=True)
+ 
+         nbp.empty_tmp_con_dir()
+-        nbp.set_library_permissions()
+         nbp.delete_current_file()
+         del nbp # New in Version 2.0.0, should drastically reduce memory usage with large ingests
+ 
+diff --git a/scripts/kindle_epub_fixer.py b/scripts/kindle_epub_fixer.py
+index 6d02e7e..597a1ae 100644
+--- a/scripts/kindle_epub_fixer.py
++++ b/scripts/kindle_epub_fixer.py
+@@ -22,11 +22,11 @@ from cwa_db import CWA_DB
+ ### Translated from Javascript to Python & modified by crocodilestick
+ 
+ ### Global Variables
+-dirs_json = "/app/calibre-web-automated/dirs.json"
+-change_logs_dir = "/app/calibre-web-automated/metadata_change_logs"
+-metadata_temp_dir = "/app/calibre-web-automated/metadata_temp"
++dirs_json = "/opt/cwa/dirs.json"
++change_logs_dir = "/opt/cwa/metadata_change_logs"
++metadata_temp_dir = "/opt/cwa/metadata_temp"
+ # Log file path
+-epub_fixer_log_file = "/config/epub-fixer.log"
++epub_fixer_log_file = "/var/lib/cwa/epub-fixer.log"
+ 
+ ### LOGGING
+ # Define the logger
+@@ -41,17 +41,6 @@ file_handler.setFormatter(formatter)
+ # Add the handler to the logger
+ logger.addHandler(file_handler)
+ 
+-# Define user and group
+-USER_NAME = "abc"
+-GROUP_NAME = "abc"
+-
+-# Get UID and GID
+-uid = pwd.getpwnam(USER_NAME).pw_uid
+-gid = grp.getgrnam(GROUP_NAME).gr_gid
+-
+-# Set permissions for log file
+-os.chown(epub_fixer_log_file, uid, gid)
+-
+ def print_and_log(string, log=True) -> None:
+     """ Ensures the provided string is passed to STDOUT AND stored in the run's log file """
+     if log:
+@@ -99,7 +88,7 @@ class EPUBFixer:
+         """Backup original file"""
+         if self.cwa_settings['auto_backup_epub_fixes']:
+             try:
+-                output_path = f"/config/processed_books/fixed_originals/"
++                output_path = f"/var/lib/cwa/processed_books/fixed_originals/"
+                 shutil.copy2(epub_path, output_path)
+             except Exception as e:
+                 print_and_log(f"[cwa-kindle-epub-fixer] ERROR - Error occurred when backing up {epub_path} to {output_path}:\n{e}", log=self.manually_triggered)
+@@ -425,4 +414,4 @@ def main():
+     
+ 
+ if __name__ == "__main__":
+-    main()
+\ No newline at end of file
++    main()
