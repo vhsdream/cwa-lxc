@@ -131,12 +131,47 @@ cat <<EOF >/etc/systemd/system/cwa.target
 [Unit]
 Description=Calibre-Web Automated Services
 After=network-online.target
-Wants=cps.service cwa-autolibrary.service cwa-ingester.service cwa-change-detector.service
+Wants=cps.service cwa-autolibrary.service cwa-ingester.service cwa-change-detector.service cwa-autozip.timer
 
 [Install]
 WantedBy=multi-user.target
 EOF
 echo "Service files created." && sleep 1
+
+# Create service for auto-zip backups and systemd timer
+echo "Creating Auto-Zip service & timer..." && sleep 1
+cat <<EOF >/etc/systemd/system/cwa-autozip.service
+[Unit]
+Description=Calibre-Web Automated Nightly Auto-Zip Backup Service
+After=network.target cps.service
+
+[Service]
+Type=simple
+WorkingDirectory=/var/lib/cwa/processed_books
+ExecStart=/usr/bin/python3 /opt/cwa/scripts/auto_zip.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat <<EOF >/etc/systemd/system/cwa-autozip.timer
+[Unit]
+Description=Calibre-Web Automated Nightly Auto-Zip Backup Timer
+RefuseManualStart=no
+RefuseManualStop=no
+
+[Timer]
+Persistent=true
+# run every day at 11:59PM
+OnCalendar=*-*-* 23:59:00
+Unit=cwa-autozip.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+echo "Auto-backup service & timer created" && sleep 1
 
 # Enable CWA Service target
 echo "Enabling & starting services via cwa.target..." && sleep 1
