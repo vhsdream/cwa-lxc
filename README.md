@@ -18,6 +18,7 @@
   - [Quick Install](#quick-install-) 🚀
   - [Docker-Compose](#using-docker-compose-recommended) 🐋⭐(Recommended)
   - [Users Migrating from stock Calibre Web](#users-migrating-from-stock-calibre-web) 🔄
+  - [Proxmox users migrating from a Calibre-Web LXC installation](#proxmox-users-migrating-from-a-calibre-web-lxc-installation) 🖥️
   - [Post-Install Tasks](#post-install-tasks) 🏁
     - [Default Login Credentials 🔑](#default-admin-login)
 - [Usage](#usage-) 🔧
@@ -272,6 +273,19 @@ And just like that, Calibre-Web Automated should be up and running! **HOWEVER** 
   3. Mount the same folder containing your Calibre Library (the Docker Compose for the Linuxserver image of Calibre Web has this as `/books` by default)
 - And then you're done! All of your users, settings ect. should be automatically carried over into your new CWA instance! Enjoy!
 - If you run into an issue where the Web UI won't load, trying using the same port as you did for CW and then reconfiguring if you want to once you've got everything set up
+
+# Proxmox users migrating from a Calibre-Web LXC installation
+
+- This is a little bit more tricky and is geared towards more advanced users
+- It is **only** for those who installed Calibre-Web using the [Proxmox Community Helper Script](https://github.com/community-scripts/ProxmoxVE)
+- It is also a work-in-progress and is not yet on feature parity with CWA proper, there are a lot of bugs
+- Once run, you really can't go back to regular Calibre-Web, and currently you will no longer be able to update using the helper script (may be possible in future)
+- Follow these instructions to upgrade your Calibre-Web LXC to Calibre-Web Automated **AT YOUR OWN RISK**:
+  1. Download the installer/conversion script from [this gist](https://gist.github.com/vhsdream/58fb87c4b10e8fd5a09b3cfcf99cb4f0) to your Calibre-Web LXC
+  2. Run the Helper-Script `update` function to check for updates, and to add/remove any optional add-ons for Calibre-Web
+  3. Run the installer/conversion script: `bash ./cwa_install.sh`
+  4. The script will then stop Calibre-Web, install necessary dependencies, clone the CWA repo and patch several files (see the patch [here](https://github.com/vhsdream/cwa-lxc/blob/dev/proxmox-lxc.patch)), create service files and then start all services
+- If the script didn't destroy your Calibre-Web LXC it is a good day. Log back into your Calibre-Web server and get a load of the new features/options!
 
 # Post-Install Tasks:
 
