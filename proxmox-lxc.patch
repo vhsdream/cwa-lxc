@@ -1,158 +1,42 @@
-diff --git a/cwa_install.sh b/cwa_install.sh
-new file mode 100644
-index 0000000..5d77156
---- /dev/null
-+++ b/cwa_install.sh
-@@ -0,0 +1,149 @@
-+#! /usr/bin/env bash
+diff --git a/README.md b/README.md
+index d49e5b3..6bdb3ed 100644
+--- a/README.md
++++ b/README.md
+@@ -18,6 +18,7 @@
+   - [Quick Install](#quick-install-) 🚀
+   - [Docker-Compose](#using-docker-compose-recommended) 🐋⭐(Recommended)
+   - [Users Migrating from stock Calibre Web](#users-migrating-from-stock-calibre-web) 🔄
++  - [Proxmox users migrating from a Calibre-Web LXC installation](#proxmox-users-migrating-from-a-calibre-web-lxc-installation) 🖥️
+   - [Post-Install Tasks](#post-install-tasks) 🏁
+     - [Default Login Credentials 🔑](#default-admin-login)
+ - [Usage](#usage-) 🔧
+@@ -273,6 +274,19 @@ And just like that, Calibre-Web Automated should be up and running! **HOWEVER**
+ - And then you're done! All of your users, settings ect. should be automatically carried over into your new CWA instance! Enjoy!
+ - If you run into an issue where the Web UI won't load, trying using the same port as you did for CW and then reconfiguring if you want to once you've got everything set up
+ 
++# Proxmox users migrating from a Calibre-Web LXC installation
 +
-+# Dirty install script for Calibre-Web Automated
-+# Done over top of a Calibre-Web install via Proxmox Helper Script
-+# https://github.com/community-scripts/ProxmoxVE/blob/main/install/calibre-web-install.sh
-+# Author: vhsdream 2025
-+# USE AT YOUR OWN RISK
-+# AFTER RUNNING THIS SCRIPT IT'S LIKELY YOU CAN NO LONGER USE THE 'update' FUNCTION
-+# FROM Proxmox Helper Scripts
++- This is a little bit more tricky and is geared towards more advanced users
++- It is **only** for those who installed Calibre-Web using the [Proxmox Community Helper Script](https://github.com/community-scripts/ProxmoxVE)
++- It is also a work-in-progress and is not yet on feature parity with CWA proper, there are a lot of bugs
++- Once run, you really can't go back to regular Calibre-Web, and currently you will no longer be able to update using the helper script (may be possible in future)
++- Follow these instructions to upgrade your Calibre-Web LXC to Calibre-Web Automated **AT YOUR OWN RISK**:
++  1. Download the installer/conversion script from [this gist](https://gist.github.com/vhsdream/58fb87c4b10e8fd5a09b3cfcf99cb4f0) to your Calibre-Web LXC
++  2. Run the Helper-Script `update` function to check for updates, and to add/remove any optional add-ons for Calibre-Web
++  3. Run the installer/conversion script: `bash ./cwa_install.sh`
++  4. The script will then stop Calibre-Web, install necessary dependencies, clone the CWA repo and patch several files (see the patch [here](https://github.com/vhsdream/cwa-lxc/blob/dev/proxmox-lxc.patch)), create service files and then start all services
++- If the script didn't destroy your Calibre-Web LXC it is a good day. Log back into your Calibre-Web server and get a load of the new features/options!
 +
-+set -euo pipefail
-+
-+# give warning
-+echo "This script only works if Calibre-Web was installed with the Proxmox Helper Script" && sleep 3
-+echo "If it succeeds, you can no longer use the 'update' function from Proxmox Helper Scripts" && sleep 3
-+echo "Run this script at your own risk. I TAKE NO RESPONSIBILITY FOR DATA LOSS!" && sleep 3
-+echo "You have 5 seconds to cancel before the script proceeds..." && sleep 6
-+
-+# stop Calibre-web
-+echo "Stopping Calibre-Web service & installing CWA dependencies..." && sleep 1
-+systemctl disable -q --now cps
-+apt-get update && \
-+apt-get install -y --no-install-recommends \
-+  build-essential \
-+  git \
-+  libldap2-dev \
-+  libsasl2-dev \
-+  ghostscript \
-+  libldap-2.5-0 \
-+  libmagic1 \
-+  libsasl2-2 \
-+  libxi6 \
-+  libxslt1.1 \
-+  python3-venv \
-+  xdg-utils \
-+  inotify-tools \
-+  sqlite3 \
-+
-+echo "Dependencies installed." && sleep 2
-+# get CWA fork with modified scripts
-+echo "Cloning Calibre-Web Automated & switching to latest release branch..." && sleep 1
-+cd /opt
-+RELEASE=$(curl -s https://api.github.com/repos/crocodilestick/Calibre-Web-Automated/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-+git clone https://github.com/crocodilestick/Calibre-Web-Automated.git /opt/cwa --single-branch &>/dev/null
-+git checkout V${RELEASE} &>/dev/null
-+cd /opt/cwa
-+echo "Repo ready." && sleep 1
-+
-+# install additional reqs for CWA
-+echo "Installing Python requirements for CWA..." && sleep 1
-+pip install -r requirements.txt -qqq
-+echo "Installed." && sleep 2
-+
-+# Install git patch file
-+echo "Applying git patch for Proxmox LXC compatibility..." && sleep 1
-+# Patch will likely need to be downloaded from somewhere
-+# wget -q https://github-location-of-patch.patch
-+wget -q https://raw.githubusercontent.com/vhsdream/cwa-lxc/refs/heads/git-patch/proxmox-lxc.patch -O /opt/proxmox-lxc.patch
-+git apply /opt/proxmox-lxc.patch &>/dev/null
-+
-+# creating dirs, according to setup-cwa.sh and the cwa-init s6 script (with some changes for compatibility)
-+echo "Creating required directories for CWA..." && sleep 1
-+mkdir -p /opt/cwa/metadata_change_logs /opt/cwa/metadata_temp /opt/cwa-book-ingest
-+mkdir -p /var/lib/cwa/processed_books/converted
-+mkdir -p /var/lib/cwa/processed_books/imported
-+mkdir -p /var/lib/cwa/processed_books/failed
-+mkdir -p /var/lib/cwa/processed_books/fixed_originals
-+mkdir -p /var/lib/cwa/log_archive
-+mkdir -p /var/lib/cwa/.cwa_conversion_tmp
-+# the 'calibre-library' is simply the /opt/calibre-web dir so no need to change
-+ 
-+# copy modified calibre-web files from CWA
-+echo "Copying patched Calibre-Web files to local Python lib folder..." && sleep 1
-+cp -r /opt/cwa/root/app/calibre-web/cps/* /usr/local/lib/python3.11/dist-packages/calibreweb/cps
-+
-+# Create service files for CWA workers
-+echo "Creating CWA worker service files..." && sleep 1
-+cat <<EOF >/etc/systemd/system/cwa-autolibrary.service
-+[Unit]
-+Description=Calibre-Web Automated Auto-Library Service
-+After=network.target cps.service
-+
-+[Service]
-+Type=simple
-+WorkingDirectory=/opt/cwa
-+ExecStart=/usr/bin/python3 /opt/cwa/scripts/auto_library.py
-+TimeoutStopSec=10
-+KillMode=process
-+Restart=on-failure
-+
-+[Install]
-+WantedBy=multi-user.target
-+EOF
-+
-+cat <<EOF >/etc/systemd/system/cwa-ingester.service
-+[Unit]
-+Description=Calibre-Web Automated Ingest Service
-+After=network.target cps.service cwa-autolibrary.service
-+
-+[Service]
-+Type=simple
-+WorkingDirectory=/opt/cwa
-+ExecStart=/usr/bin/bash -c /opt/cwa/scripts/ingest-service.sh
-+TimeoutStopSec=10
-+KillMode=process
-+Restart=on-failure
-+
-+[Install]
-+WantedBy=multi-user.target
-+EOF
-+
-+cat <<EOF >/etc/systemd/system/cwa-change-detector.service
-+[Unit]
-+Description=Calibre-Web Automated Metadata Change Detector Service
-+After=network.target cps.service cwa-autolibrary.service
-+
-+[Service]
-+Type=simple
-+WorkingDirectory=/opt/cwa
-+ExecStart=/usr/bin/bash -c /opt/cwa/scripts/change-detector.sh
-+TimeoutStopSec=10
-+KillMode=process
-+Restart=on-failure
-+
-+[Install]
-+WantedBy=multi-user.target
-+EOF
-+
-+cat <<EOF >/etc/systemd/system/cwa.target
-+[Unit]
-+Description=Calibre-Web Automated Services
-+After=network-online.target
-+Wants=cps.service cwa-autolibrary.service cwa-ingester.service cwa-change-detector.service
-+
-+[Install]
-+WantedBy=multi-user.target
-+EOF
-+echo "Service files created." && sleep 1
-+
-+# Enable CWA Service target
-+echo "Enabling & starting services via cwa.target..." && sleep 1
-+systemctl daemon-reload
-+systemctl enable -q --now cwa.target
-+echo "CWA started! (hopefully)" && sleep 1
-+
-+# then cleanup etc etc
-+echo "Cleaning up..." && sleep 1
-+apt autoremove - y &>/dev/null && apt autoclean -y &>/dev/null
-+echo "Done!"
+ # Post-Install Tasks:
+ 
+ ## _Calibre-Web Quick Start Guide_
+@@ -363,4 +377,4 @@ Check out [Post-Install Tasks Here](#post-install-tasks) when necessary.
+ 
+ - CWA is really lucky to have a very passionate and active community of people that really help shape CWA into what it is today
+ - If you have any ideas or want to contribute to the project, you're more than welcome to! We accept anyone regardless of skill level of expertise!
+-- If you've got a good idea or want to simply suggest improvements, simply get in touch with us on the Discord Server [here](https://discord.gg/EjgSeek94R)!
+\ No newline at end of file
++- If you've got a good idea or want to simply suggest improvements, simply get in touch with us on the Discord Server [here](https://discord.gg/EjgSeek94R)!
 diff --git a/dirs.json b/dirs.json
 index 3b81acd..9fd2e8e 100644
 --- a/dirs.json
@@ -168,124 +52,6 @@ index 3b81acd..9fd2e8e 100644
 +    "calibre_library_dir": "/opt/calibre-web",
 +    "tmp_conversion_dir": "/var/lib/cwa/.cwa_conversion_tmp"
 +}
-diff --git a/proxmox-lxc.patch b/proxmox-lxc.patch
-new file mode 100644
-index 0000000..b48556c
---- /dev/null
-+++ b/proxmox-lxc.patch
-@@ -0,0 +1,111 @@
-+diff --git a/cwa_install.sh b/cwa_install.sh
-+new file mode 100644
-+index 0000000..5d77156
-+--- /dev/null
-++++ b/cwa_install.sh
-+@@ -0,0 +1,149 @@
-++#! /usr/bin/env bash
-++
-++# Dirty install script for Calibre-Web Automated
-++# Done over top of a Calibre-Web install via Proxmox Helper Script
-++# https://github.com/community-scripts/ProxmoxVE/blob/main/install/calibre-web-install.sh
-++# Author: vhsdream 2025
-++# USE AT YOUR OWN RISK
-++# AFTER RUNNING THIS SCRIPT IT'S LIKELY YOU CAN NO LONGER USE THE 'update' FUNCTION
-++# FROM Proxmox Helper Scripts
-++
-++set -euo pipefail
-++
-++# give warning
-++echo "This script only works if Calibre-Web was installed with the Proxmox Helper Script" && sleep 3
-++echo "If it succeeds, you can no longer use the 'update' function from Proxmox Helper Scripts" && sleep 3
-++echo "Run this script at your own risk. I TAKE NO RESPONSIBILITY FOR DATA LOSS!" && sleep 3
-++echo "You have 5 seconds to cancel before the script proceeds..." && sleep 6
-++
-++# stop Calibre-web
-++echo "Stopping Calibre-Web service & installing CWA dependencies..." && sleep 1
-++systemctl disable -q --now cps
-++apt-get update && \
-++apt-get install -y --no-install-recommends \
-++  build-essential \
-++  git \
-++  libldap2-dev \
-++  libsasl2-dev \
-++  ghostscript \
-++  libldap-2.5-0 \
-++  libmagic1 \
-++  libsasl2-2 \
-++  libxi6 \
-++  libxslt1.1 \
-++  python3-venv \
-++  xdg-utils \
-++  inotify-tools \
-++  sqlite3 \
-++
-++echo "Dependencies installed." && sleep 2
-++# get CWA fork with modified scripts
-++echo "Cloning Calibre-Web Automated & switching to latest release branch..." && sleep 1
-++cd /opt
-++RELEASE=$(curl -s https://api.github.com/repos/crocodilestick/Calibre-Web-Automated/releases/latest | grep "tag_name" | awk '{print substr($2, 3, length($2)-4) }')
-++git clone https://github.com/crocodilestick/Calibre-Web-Automated.git /opt/cwa --single-branch &>/dev/null
-++git checkout V${RELEASE} &>/dev/null
-++cd /opt/cwa
-++echo "Repo ready." && sleep 1
-++
-++# install additional reqs for CWA
-++echo "Installing Python requirements for CWA..." && sleep 1
-++pip install -r requirements.txt -qqq
-++echo "Installed." && sleep 2
-++
-++# Install git patch file
-++echo "Applying git patch for Proxmox LXC compatibility..." && sleep 1
-++# Patch will likely need to be downloaded from somewhere
-++# wget -q https://github-location-of-patch.patch
-++wget -q https://raw.githubusercontent.com/vhsdream/cwa-lxc/refs/heads/git-patch/proxmox-lxc.patch -O /opt/proxmox-lxc.patch
-++git apply /opt/proxmox-lxc.patch &>/dev/null
-++
-++# creating dirs, according to setup-cwa.sh and the cwa-init s6 script (with some changes for compatibility)
-++echo "Creating required directories for CWA..." && sleep 1
-++mkdir -p /opt/cwa/metadata_change_logs /opt/cwa/metadata_temp /opt/cwa-book-ingest
-++mkdir -p /var/lib/cwa/processed_books/converted
-++mkdir -p /var/lib/cwa/processed_books/imported
-++mkdir -p /var/lib/cwa/processed_books/failed
-++mkdir -p /var/lib/cwa/processed_books/fixed_originals
-++mkdir -p /var/lib/cwa/log_archive
-++mkdir -p /var/lib/cwa/.cwa_conversion_tmp
-++# the 'calibre-library' is simply the /opt/calibre-web dir so no need to change
-++ 
-++# copy modified calibre-web files from CWA
-++echo "Copying patched Calibre-Web files to local Python lib folder..." && sleep 1
-++cp -r /opt/cwa/root/app/calibre-web/cps/* /usr/local/lib/python3.11/dist-packages/calibreweb/cps
-++
-++# Create service files for CWA workers
-++echo "Creating CWA worker service files..." && sleep 1
-++cat <<EOF >/etc/systemd/system/cwa-autolibrary.service
-++[Unit]
-++Description=Calibre-Web Automated Auto-Library Service
-++After=network.target cps.service
-++
-++[Service]
-++Type=simple
-++WorkingDirectory=/opt/cwa
-++ExecStart=/usr/bin/python3 /opt/cwa/scripts/auto_library.py
-++TimeoutStopSec=10
-++KillMode=process
-++Restart=on-failure
-++
-++[Install]
-++WantedBy=multi-user.target
-++EOF
-++
-++cat <<EOF >/etc/systemd/system/cwa-ingester.service
-++[Unit]
-++Description=Calibre-Web Automated Ingest Service
-++After=network.target cps.service cwa-autolibrary.service
-++
-++[Service]
-++Type=simple
-++WorkingDirectory=/opt/cwa
-++ExecStart=/usr/bin/bash -c /opt/cwa/scripts/ingest-service.sh
-++TimeoutStopSec=10
-++KillMode=proc
-\ No newline at end of file
 diff --git a/root/app/calibre-web/cps/cwa_functions.py b/root/app/calibre-web/cps/cwa_functions.py
 index e2428f7..7bbc4e4 100644
 --- a/root/app/calibre-web/cps/cwa_functions.py
@@ -551,26 +317,6 @@ index 00c7622..2973146 100644
 -    main()
 \ No newline at end of file
 +    main()
-diff --git a/scripts/change-detector.sh b/scripts/change-detector.sh
-new file mode 100755
-index 0000000..218330a
---- /dev/null
-+++ b/scripts/change-detector.sh
-@@ -0,0 +1,14 @@
-+#!/usr/bin/env bash
-+
-+echo "========== STARTING METADATA CHANGE DETECTOR ==========="
-+
-+# Folder to monitor
-+WATCH_FOLDER="/opt/cwa/metadata_change_logs"
-+echo "[metadata-change-detector] Watching folder: $WATCH_FOLDER"
-+
-+# Monitor the folder for new files
-+inotifywait -m -e close_write -e moved_to --exclude '^.*\.(swp)$' "$WATCH_FOLDER" |
-+while read -r directory events filename; do
-+        echo "[metadata-change-detector] New file detected: $filename"
-+        python3 /opt/cwa/scripts/cover_enforcer.py "--log" "$filename"
-+done
 diff --git a/scripts/check-cwa-services.sh b/scripts/check-cwa-services.sh
 old mode 100644
 new mode 100755
@@ -752,48 +498,6 @@ index c3182f4..670531e 100644
 -    main()
 \ No newline at end of file
 +    main()
-diff --git a/scripts/ingest-service.sh b/scripts/ingest-service.sh
-new file mode 100755
-index 0000000..63c0b76
---- /dev/null
-+++ b/scripts/ingest-service.sh
-@@ -0,0 +1,36 @@
-+#!/usr/bin/env bash
-+
-+# https://github.com/janeczku/calibre-web/wiki/Automatically-import-new-books-(Linux)
-+
-+# This script is used to automatically import downloaded ebooks into a Calibre database.
-+# Reference: https://manual.calibre-ebook.com/generated/en/calibredb.html#add
-+echo "========== STARTING CWA-INGEST SERVICE =========="
-+
-+WATCH_FOLDER=$(grep -o '"ingest_folder": "[^"]*' /opt/cwa/dirs.json | grep -o '[^"]*$')
-+echo "[cwa-ingest-service] Watching folder: $WATCH_FOLDER"
-+
-+# Monitor the folder for new files
-+inotifywait -m -r --format="%e %w%f" -e close_write -e moved_to "$WATCH_FOLDER" |
-+while read -r events filepath ; do
-+        # if [[ $(grep "$filepath" ingest-log-test.txt | egrep -o '[0-9]{10}') ]]; then
-+        #         CURRENT_TIME=$(date +'%s')
-+        #         TIME_OF_MATCH=$(grep "$filepath" ingest-log-test.txt | egrep -o '[0-9]{10}')
-+        #         TODO NEED TO GET DIFFERENCE BETWEEN THE 2 TIMES AND IF LESS THAN 60 SECONDS, IGNORE
-+        echo "[cwa-ingest-service] New files detected - $filepath - Starting Ingest Processor..."
-+        python3 /opt/cwa/scripts/ingest_processor.py "$filepath" # &
-+        # echo "'${filepath}' - $(date +'%s')" >> /config/.ingest_dupe_list
-+        # INGEST_PROCESSOR_PID=$!
-+        # Wait for the ingest processor to finish
-+        # wait $INGEST_PROCESSOR_PID
-+        # if ! [[ $(ls -A "$WATCH_FOLDER") ]]; then
-+        #         FILES="${WATCH_FOLDER}/*"
-+        #         for f in $FILES
-+        #         do
-+        #                 python3 /opt/cwa/scripts/ingest_processor.py "$f" &
-+        #                 INGEST_PROCESSOR_PID=$!
-+        #                 # Wait for the ingest processor to finish
-+        #                 wait $INGEST_PROCESSOR_PID
-+        #         done
-+        # fi
-+done
-+
 diff --git a/scripts/ingest_processor.py b/scripts/ingest_processor.py
 index 1e04e98..7adba71 100644
 --- a/scripts/ingest_processor.py
