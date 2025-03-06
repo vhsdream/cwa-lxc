@@ -14,8 +14,8 @@ from cwa_db import CWA_DB
 
 # Global Variables
 dirs_json = "/opt/cwa/dirs.json"
-change_logs_dir = "/opt/cwa/metadata_change_logs"
-metadata_temp_dir = "/opt/cwa/metadata_temp"
+change_logs_dir = "/var/lib/cwa/metadata_change_logs"
+metadata_temp_dir = "/var/lib/cwa/metadata_temp"
 
 
 # Creates a lock file unless one already exists meaning an instance of the script is

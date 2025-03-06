@@ -3,7 +3,7 @@
 echo "========== STARTING METADATA CHANGE DETECTOR ==========="
 
 # Folder to monitor
-WATCH_FOLDER="/opt/cwa/metadata_change_logs"
+WATCH_FOLDER="/var/lib/cwa/metadata_change_logs"
 echo "[metadata-change-detector] Watching folder: $WATCH_FOLDER"
 
 # Monitor the folder for new files
