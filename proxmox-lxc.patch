@@ -1,42 +1,3 @@
-diff --git a/README.md b/README.md
-index d49e5b3..6bdb3ed 100644
---- a/README.md
-+++ b/README.md
-@@ -18,6 +18,7 @@
-   - [Quick Install](#quick-install-) 🚀
-   - [Docker-Compose](#using-docker-compose-recommended) 🐋⭐(Recommended)
-   - [Users Migrating from stock Calibre Web](#users-migrating-from-stock-calibre-web) 🔄
-+  - [Proxmox users migrating from a Calibre-Web LXC installation](#proxmox-users-migrating-from-a-calibre-web-lxc-installation) 🖥️
-   - [Post-Install Tasks](#post-install-tasks) 🏁
-     - [Default Login Credentials 🔑](#default-admin-login)
- - [Usage](#usage-) 🔧
-@@ -273,6 +274,19 @@ And just like that, Calibre-Web Automated should be up and running! **HOWEVER**
- - And then you're done! All of your users, settings ect. should be automatically carried over into your new CWA instance! Enjoy!
- - If you run into an issue where the Web UI won't load, trying using the same port as you did for CW and then reconfiguring if you want to once you've got everything set up
- 
-+# Proxmox users migrating from a Calibre-Web LXC installation
-+
-+- This is a little bit more tricky and is geared towards more advanced users
-+- It is **only** for those who installed Calibre-Web using the [Proxmox Community Helper Script](https://github.com/community-scripts/ProxmoxVE)
-+- It is also a work-in-progress and is not yet on feature parity with CWA proper, there are a lot of bugs
-+- Once run, you really can't go back to regular Calibre-Web, and currently you will no longer be able to update using the helper script (may be possible in future)
-+- Follow these instructions to upgrade your Calibre-Web LXC to Calibre-Web Automated **AT YOUR OWN RISK**:
-+  1. Download the installer/conversion script from [this gist](https://gist.github.com/vhsdream/58fb87c4b10e8fd5a09b3cfcf99cb4f0) to your Calibre-Web LXC
-+  2. Run the Helper-Script `update` function to check for updates, and to add/remove any optional add-ons for Calibre-Web
-+  3. Run the installer/conversion script: `bash ./cwa_install.sh`
-+  4. The script will then stop Calibre-Web, install necessary dependencies, clone the CWA repo and patch several files (see the patch [here](https://github.com/vhsdream/cwa-lxc/blob/dev/proxmox-lxc.patch)), create service files and then start all services
-+- If the script didn't destroy your Calibre-Web LXC it is a good day. Log back into your Calibre-Web server and get a load of the new features/options!
-+
- # Post-Install Tasks:
- 
- ## _Calibre-Web Quick Start Guide_
-@@ -363,4 +377,4 @@ Check out [Post-Install Tasks Here](#post-install-tasks) when necessary.
- 
- - CWA is really lucky to have a very passionate and active community of people that really help shape CWA into what it is today
- - If you have any ideas or want to contribute to the project, you're more than welcome to! We accept anyone regardless of skill level of expertise!
--- If you've got a good idea or want to simply suggest improvements, simply get in touch with us on the Discord Server [here](https://discord.gg/EjgSeek94R)!
-\ No newline at end of file
-+- If you've got a good idea or want to simply suggest improvements, simply get in touch with us on the Discord Server [here](https://discord.gg/EjgSeek94R)!
 diff --git a/dirs.json b/dirs.json
 index 3b81acd..9fd2e8e 100644
 --- a/dirs.json
@@ -53,7 +14,7 @@ index 3b81acd..9fd2e8e 100644
 +    "tmp_conversion_dir": "/var/lib/cwa/.cwa_conversion_tmp"
 +}
 diff --git a/root/app/calibre-web/cps/cwa_functions.py b/root/app/calibre-web/cps/cwa_functions.py
-index e2428f7..7bbc4e4 100644
+index cef7a47..26d801e 100644
 --- a/root/app/calibre-web/cps/cwa_functions.py
 +++ b/root/app/calibre-web/cps/cwa_functions.py
 @@ -24,7 +24,7 @@ from werkzeug.utils import secure_filename
@@ -230,7 +191,7 @@ index 23a3d86..36d4f6b 100644
  
  
 diff --git a/scripts/auto_library.py b/scripts/auto_library.py
-index 6d34be5..c7d4b5f 100644
+index 6d34be5..541b4d9 100644
 --- a/scripts/auto_library.py
 +++ b/scripts/auto_library.py
 @@ -20,13 +20,13 @@ def main():
@@ -253,7 +214,7 @@ index 6d34be5..c7d4b5f 100644
  
          self.metadb_path = None
          self.lib_path = None
-@@ -44,14 +44,13 @@ class AutoLibrary:
+@@ -44,12 +44,12 @@ class AutoLibrary:
              self._metadb_path = path
              self.lib_path = os.path.dirname(path)
  
@@ -266,20 +227,9 @@ index 6d34be5..c7d4b5f 100644
 -            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /app/calibre-web-automated/empty_library/app.db")
 +            print(f"[cwa-auto-library] No app.db found in {self.config_dir}, copying from /opt/cwa/empty_library/app.db")
              shutil.copyfile(self.empty_appdb, f"{self.config_dir}/app.db")
--            os.system(f"chown -R abc:abc {self.config_dir}")
+             os.system(f"chown -R abc:abc {self.config_dir}")
              print(f"[cwa-auto-library] app.db successfully copied to {self.config_dir}")
-         else:
-             return
-@@ -74,7 +73,7 @@ class AutoLibrary:
-             index_of_biggest_db = max(range(len(db_sizes)), key=db_sizes.__getitem__)
-             self.metadb_path = db_files[index_of_biggest_db]
-             print(f"\n[cwa-auto-library]: Automatically mounting the largest database using the following db file - {db_files[index_of_biggest_db]} ...")
--            print("\n[cwa-auto-library]: If this is unwanted, please ensure only 1 metadata.db file / only your desired Calibre Database exists in '/calibre-library', then restart the container")
-+            print("\n[cwa-auto-library]: If this is unwanted, please ensure only 1 metadata.db file / only your desired Calibre Database exists in '/opt/calibre-web', then restart the container")
-             return True
-         else:
-             return False
-@@ -123,14 +122,13 @@ class AutoLibrary:
+@@ -123,7 +123,7 @@ class AutoLibrary:
              print(e)
              sys.exit(1)
  
@@ -288,9 +238,7 @@ index 6d34be5..c7d4b5f 100644
      def make_new_library(self):
          print("[cwa-auto-library]: No existing library found. Creating new library...")
          shutil.copyfile(self.empty_metadb, f"{self.library_dir}/metadata.db")
--        os.system(f"chown -R abc:abc {self.library_dir}")
-         self.metadb_path = f"{self.library_dir}/metadata.db"
-         return
+@@ -133,4 +133,4 @@ class AutoLibrary:
  
  
  if __name__ == '__main__':
@@ -298,7 +246,7 @@ index 6d34be5..c7d4b5f 100644
 \ No newline at end of file
 +    main()
 diff --git a/scripts/auto_zip.py b/scripts/auto_zip.py
-index 00c7622..2973146 100644
+index 00c7622..e782de5 100644
 --- a/scripts/auto_zip.py
 +++ b/scripts/auto_zip.py
 @@ -9,7 +9,7 @@ from cwa_db import CWA_DB
@@ -306,7 +254,7 @@ index 00c7622..2973146 100644
  class AutoZipper:
      def __init__(self):
 -        self.archive_dirs_stem = "/config/processed_books/"
-+        self.archive_dirs_stem = "/var/lib/cwa/processed_books/"
++        self.archive_dirs_stem = "/var/lib/cwaprocessed_books/"
          self.converted_dir = self.archive_dirs_stem + "converted/"
          self.failed_dir = self.archive_dirs_stem + "failed/"
          self.imported_dir = self.archive_dirs_stem + "imported/"
@@ -318,7 +266,7 @@ index 00c7622..2973146 100644
 \ No newline at end of file
 +    main()
 diff --git a/scripts/change-detector.sh b/scripts/change-detector.sh
-new file mode 100755
+new file mode 100644
 index 0000000..218330a
 --- /dev/null
 +++ b/scripts/change-detector.sh
@@ -338,9 +286,7 @@ index 0000000..218330a
 +        python3 /opt/cwa/scripts/cover_enforcer.py "--log" "$filename"
 +done
 diff --git a/scripts/check-cwa-services.sh b/scripts/check-cwa-services.sh
-old mode 100644
-new mode 100755
-index b2c87f4..cb0d8f7
+index b2c87f4..cb0d8f7 100644
 --- a/scripts/check-cwa-services.sh
 +++ b/scripts/check-cwa-services.sh
 @@ -1,15 +1,17 @@
@@ -381,7 +327,7 @@ index b2c87f4..cb0d8f7
 \ No newline at end of file
 +fi
 diff --git a/scripts/convert_library.py b/scripts/convert_library.py
-index 0d65c87..38f1cf0 100644
+index 0d65c87..aa74449 100644
 --- a/scripts/convert_library.py
 +++ b/scripts/convert_library.py
 @@ -18,7 +18,7 @@ from cwa_db import CWA_DB
@@ -425,7 +371,7 @@ index 0d65c87..38f1cf0 100644
  
          self.current_book = 1
 -        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs('/app/calibre-web-automated/dirs.json') 
-+        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs('/opt/cwa/dirs.json') 
++        self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs('/opt/cwa/dirs.json')
          self.to_convert = self.get_books_to_convert()
  
  
@@ -519,11 +465,11 @@ index c3182f4..670531e 100644
 \ No newline at end of file
 +    main()
 diff --git a/scripts/ingest-service.sh b/scripts/ingest-service.sh
-new file mode 100755
-index 0000000..63c0b76
+new file mode 100644
+index 0000000..b7459d0
 --- /dev/null
 +++ b/scripts/ingest-service.sh
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,35 @@
 +#!/usr/bin/env bash
 +
 +# https://github.com/janeczku/calibre-web/wiki/Automatically-import-new-books-(Linux)
@@ -559,7 +505,6 @@ index 0000000..63c0b76
 +        #         done
 +        # fi
 +done
-+
 diff --git a/scripts/ingest_processor.py b/scripts/ingest_processor.py
 index 1e04e98..7adba71 100644
 --- a/scripts/ingest_processor.py
