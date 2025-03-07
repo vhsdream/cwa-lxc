@@ -3,9 +3,9 @@
 ## Replacer Function
 
 - [ ] Figure out what text needs replacing
-- [ ] Figure out what files are to be modified
+- [x] Figure out what files are to be modified
 - [ ] Determine correct sequencing for sed loop
-- [ ] Trim down variables
+- [x] Trim down variables
 - [ ] Handle edge cases
 
 ## ScriptGen function
