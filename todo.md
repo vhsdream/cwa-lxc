@@ -7,6 +7,7 @@
 - [x] Determine correct sequencing for sed loop
 - [x] Trim down variables
 - [x] Handle edge cases
+- [ ] Delete some portions of files
 
 ## ScriptGen function
 
