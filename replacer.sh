@@ -5,15 +5,13 @@
 # Year: 2025
 # License: MIT
 
+# This probably should become a function within the CWA install and update scripts, if I can keep it compact
+
 # Global vars
 OLD_BASE="/app/calibre-web-automated"
 BASE="/opt/cwa"
 OLD_CONFIG="/config"
 CONFIG="/var/lib/cwa"
-OLD_SCRIPTS="$OLD_BASE/scripts"
-SCRIPTS="$BASE/scripts"
-OLD_APP="$OLD_BASE/root/app/calibre-web/cps"
-APP="$BASE/root/app/calibre-web/cps"
 OLD_DB="$OLD_CONFIG/app.db"
 DB="/root/.calibre-web/app.db"
 OLD_META_TEMP="$OLD_BASE/metadata_temp"
@@ -29,10 +27,6 @@ NEW_LIBRARY="/opt/calibre-web"
 OLD_CONVERSION_DIR="$OLD_CONFIG/.cwa_conversion_tmp"
 NEW_CONVERSION_DIR="$CONFIG/.cwa_conversion_tmp"
 
-# new scripts can be done by cat <<EOFing
-
-# start with dirs.json as that is referenced a lot
-
 # cd $BASE
 
 sed -i -e "s|\"$OLD_INGEST\"| \"$NEW_INGEST\"|" \
@@ -40,8 +34,6 @@ sed -i -e "s|\"$OLD_INGEST\"| \"$NEW_INGEST\"|" \
     -e "s|\"$OLD_CONVERSION_DIR\"| \"$NEW_CONVERSION_DIR\"|" dirs.json
 
 # Then the scripts folder
-
-# cd scripts
 PYTHON_SCRIPTS=$(find ./scripts ./root/app/calibre-web/cps -type f -name "*.py")
 # note: the python files in APP may need special treatment due to the metadata stuff being relocated (or do that first)
 
