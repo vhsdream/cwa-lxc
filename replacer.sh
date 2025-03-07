@@ -54,3 +54,7 @@ for file in $PYTHON_SCRIPTS; do
         sed -i "s|$OLD_CONFIG|"$CONFIG"|g" "$file"
     fi
 done
+
+# Deal with edge case(s)
+sed -i "s|\"/admin$CONFIG\"|\"/admin$OLD_CONFIG\"|" ./root/app/calibre-web/cps/admin.py
+sed -i "s|\"$CONFIG/post_request\"|\"$OLD_CONFIG/post_request\"|" ./root/app/calibre-web/cps/cwa_functions.py
