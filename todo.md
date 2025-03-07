@@ -19,5 +19,5 @@
 - admin.py
     - @admi.route("/admin/config", methods=["GET"])
 - cwa_functions.py
-    - # with open("/config/post_request" ,"w") as f:
+    - with open("/config/post_request" ,"w") as f:
         - however the line is commented out, so could ignore
