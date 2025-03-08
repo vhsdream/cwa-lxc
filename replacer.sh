@@ -49,6 +49,8 @@ function replacer() {
     # Deal with edge case(s)
     sed -i "s|\"/admin$CONFIG\"|\"/admin$OLD_CONFIG\"|" ./root/app/calibre-web/cps/admin.py
     sed -i "s|\"$CONFIG/post_request\"|\"$OLD_CONFIG/post_request\"|" ./root/app/calibre-web/cps/cwa_functions.py
+    sed -i -e "/^# Define user/,/^os.chown/d" -e "/nbp.set_l\|self.set_l/d" -e "/def set_libr/,/^$/d" \
+        ./scripts/convert_library.py ./scripts/kindle_epub_fixer.py ./scripts/ingest_processor.py
 }
 
 replacer && echo "Files patched" || echo "Oh fuck what just happened??"
