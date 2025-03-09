@@ -51,6 +51,7 @@ function replacer() {
     sed -i -e "s|\"/admin$CONFIG\"|\"/admin$OLD_CONFIG\"|" \
         -e "s|app/LSCW_RELEASE|opt/calibre-web/calibreweb_version.txt|g" \
         -e "s|app/CWA_RELEASE|opt/Calibre-Web-Automated_version.txt|g" \
+        -e "s|app/KEPUBIFY_RELEASE|opt/kepubify/version.txt|g" \
         -e "s/lscw_version/calibreweb_version/g" \
         -e "s|app/cwa_update_notice|opt/.cwa_update_notice|g" \
         $APP/admin.py $APP/render_template.py
