@@ -34,7 +34,7 @@ function replacer() {
 
     # not sure this will work
     for file in $FILES; do
-        for path in "${*_PATH[@]}"; do
+        for path in "${OLD_PATH[@]}" "${NEW_PATH[@]}"; do
             if grep "${OLD_PATH[path]}" "$file"; then
                 sed -i "s|${OLD_PATH[path]}|${NEW_PATH[path]}|g" "$file"
             fi
