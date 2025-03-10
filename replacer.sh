@@ -7,8 +7,7 @@
 
 # Global vars
 OLD_BASE="/app/calibre-web-automated"
-# BASE="/opt/cwa"
-BASE="/home/chris/gits/cwa-lxc"
+BASE="/opt/cwa"
 OLD_CONFIG="/config"
 CONFIG="/var/lib/cwa"
 OLD_DB="$OLD_CONFIG/app.db"
@@ -23,7 +22,7 @@ APP="$BASE/root/app/calibre-web/cps"
 
 function replacer() {
     echo "Patching files..." && sleep 2
-    # cd $BASE
+    cd $BASE
     sed -i "s|\"/calibre-library\"| \"/opt/calibre-web\"|" dirs.json ./scripts/auto_library.py
     sed -i -e "s|\"$OLD_CONFIG/$CONVERSION\"| \"$CONFIG/$CONVERSION\"|" \
         -e "s|\"/$INGEST\"| \"/opt/$INGEST\"|" dirs.json
@@ -40,25 +39,6 @@ function replacer() {
             fi
         done
     done
-
-
-    # for file in $FILES; do
-    #     if grep "$OLD_META_TEMP" "$file"; then
-    #         sed -i "s|$OLD_META_TEMP|$META_TEMP|g" "$file"
-    #     fi
-    #     if grep "$OLD_META_LOGS" "$file"; then
-    #         sed -i "s|$OLD_META_LOGS|$META_LOGS|g" "$file"
-    #     fi
-    #     if grep "$OLD_DB" "$file"; then
-    #         sed -i "s|$OLD_DB|$DB|g" "$file"
-    #     fi
-    #     if grep "$OLD_BASE" "$file"; then
-    #         sed -i "s|$OLD_BASE|$BASE|g" "$file"
-    #     fi
-    #     if grep "$OLD_CONFIG" "$file"; then
-    #         sed -i "s|$OLD_CONFIG|"$CONFIG"|g" "$file"
-    #     fi
-    # done
 
     # Deal with edge case(s)
     sed -i -e "s|\"/admin$CONFIG\"|\"/admin$OLD_CONFIG\"|" \
