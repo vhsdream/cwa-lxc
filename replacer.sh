@@ -29,13 +29,12 @@ function replacer() {
         -e "s|\"/$INGEST\"| \"/opt/$INGEST\"|" dirs.json
 
     FILES=$(find ./scripts "$APP" -type f -name "*.py")
-    OLD_PATHS="$OLD_META_TEMP,$OLD_META_LOGS,$OLD_DB,$OLD_BASE,$OLD_CONFIG"
-    NEW_PATHS="$META_TEMP,$META_LOGS,$DB,$BASE,$CONFIG"
+    OLD_PATHS=("$OLD_META_TEMP" "$OLD_META_LOGS" "$OLD_DB" "$OLD_BASE" "$OLD_CONFIG")
+    NEW_PATHS=("$META_TEMP" "$META_LOGS" "$DB" "$BASE" "$CONFIG")
 
     # not sure this will work
     for file in $FILES; do
-        for ((oldpath=$OLD_PATHS,newpath=$NEW_PATHS))
-        do
+        for oldpath,newpath in "${OLD_PATHS[@]},${NEW_PATHS[@]}"; do
             if grep "$oldpath" "$file"; then
                 sed -i "s|$oldpath|$newpath|g" "$file"
             fi
