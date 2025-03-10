@@ -32,9 +32,9 @@ function replacer() {
     OLD_PATH=("$OLD_META_TEMP" "$OLD_META_LOGS" "$OLD_DB" "$OLD_BASE" "$OLD_CONFIG")
     NEW_PATH=("$META_TEMP" "$META_LOGS" "$DB" "$BASE" "$CONFIG")
 
-    # not sure this will work
     for file in $FILES; do
-        for path in "${OLD_PATH[@]}" "${NEW_PATH[@]}"; do
+        for ((path=0;path<${#OLD_PATH[@]};path++))
+        do
             if grep "${OLD_PATH[path]}" "$file"; then
                 sed -i "s|${OLD_PATH[path]}|${NEW_PATH[path]}|g" "$file"
             fi
