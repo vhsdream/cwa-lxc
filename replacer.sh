@@ -7,7 +7,8 @@
 
 # Global vars
 OLD_BASE="/app/calibre-web-automated"
-BASE="/opt/cwa"
+# BASE="/opt/cwa"
+BASE="/home/chris/gits/cwa-lxc"
 OLD_CONFIG="/config"
 CONFIG="/var/lib/cwa"
 OLD_DB="$OLD_CONFIG/app.db"
@@ -28,24 +29,37 @@ function replacer() {
         -e "s|\"/$INGEST\"| \"/opt/$INGEST\"|" dirs.json
 
     FILES=$(find ./scripts "$APP" -type f -name "*.py")
+    OLD_PATHS="$OLD_META_TEMP,$OLD_META_LOGS,$OLD_DB,$OLD_BASE,$OLD_CONFIG"
+    NEW_PATHS="$META_TEMP,$META_LOGS,$DB,$BASE,$CONFIG"
 
+    # not sure this will work
     for file in $FILES; do
-        if grep "$OLD_META_TEMP" "$file"; then
-            sed -i "s|$OLD_META_TEMP|$META_TEMP|g" "$file"
-        fi
-        if grep "$OLD_META_LOGS" "$file"; then
-            sed -i "s|$OLD_META_LOGS|$META_LOGS|g" "$file"
-        fi
-        if grep "$OLD_DB" "$file"; then
-            sed -i "s|$OLD_DB|$DB|g" "$file"
-        fi
-        if grep "$OLD_BASE" "$file"; then
-            sed -i "s|$OLD_BASE|$BASE|g" "$file"
-        fi
-        if grep "$OLD_CONFIG" "$file"; then
-            sed -i "s|$OLD_CONFIG|"$CONFIG"|g" "$file"
-        fi
+        for ((oldpath=$OLD_PATHS,newpath=$NEW_PATHS))
+        do
+            if grep "$oldpath" "$file"; then
+                sed -i "s|$oldpath|$newpath|g" "$file"
+            fi
+        done
     done
+
+
+    # for file in $FILES; do
+    #     if grep "$OLD_META_TEMP" "$file"; then
+    #         sed -i "s|$OLD_META_TEMP|$META_TEMP|g" "$file"
+    #     fi
+    #     if grep "$OLD_META_LOGS" "$file"; then
+    #         sed -i "s|$OLD_META_LOGS|$META_LOGS|g" "$file"
+    #     fi
+    #     if grep "$OLD_DB" "$file"; then
+    #         sed -i "s|$OLD_DB|$DB|g" "$file"
+    #     fi
+    #     if grep "$OLD_BASE" "$file"; then
+    #         sed -i "s|$OLD_BASE|$BASE|g" "$file"
+    #     fi
+    #     if grep "$OLD_CONFIG" "$file"; then
+    #         sed -i "s|$OLD_CONFIG|"$CONFIG"|g" "$file"
+    #     fi
+    # done
 
     # Deal with edge case(s)
     sed -i -e "s|\"/admin$CONFIG\"|\"/admin$OLD_CONFIG\"|" \
