@@ -28,14 +28,14 @@ function replacer() {
         -e "s|\"/$INGEST\"| \"/opt/$INGEST\"|" dirs.json
 
     FILES=$(find ./scripts "$APP" -type f -name "*.py")
-    OLD_PATH=("$OLD_META_TEMP" "$OLD_META_LOGS" "$OLD_DB" "$OLD_BASE" "$OLD_CONFIG")
-    NEW_PATH=("$META_TEMP" "$META_LOGS" "$DB" "$BASE" "$CONFIG")
+    OLD_PATHS=("$OLD_META_TEMP" "$OLD_META_LOGS" "$OLD_DB" "$OLD_BASE" "$OLD_CONFIG")
+    NEW_PATHS=("$META_TEMP" "$META_LOGS" "$DB" "$BASE" "$CONFIG")
 
     for file in $FILES; do
-        for ((path=0;path<${#OLD_PATH[@]};path++))
+        for ((path=0;path<${#OLD_PATHS[@]};path++))
         do
-            if grep "${OLD_PATH[path]}" "$file"; then
-                sed -i "s|${OLD_PATH[path]}|${NEW_PATH[path]}|g" "$file"
+            if grep "${OLD_PATHS[path]}" "$file"; then
+                sed -i "s|${OLD_PATHS[path]}|${NEW_PATHS[path]}|g" "$file"
             fi
         done
     done
