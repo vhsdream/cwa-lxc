@@ -27,7 +27,7 @@ function replacer() {
     sed -i -e "s|\"$OLD_CONFIG/$CONVERSION\"| \"$CONFIG/$CONVERSION\"|" \
         -e "s|\"/$INGEST\"| \"/opt/$INGEST\"|" dirs.json
 
-    FILES=$(find ./scripts "$APP" -type f -name "*.py")
+    FILES=$(find ./scripts "$APP" -type f -name "*.py" -or -name "*.html")
     OLD_PATHS=("$OLD_META_TEMP" "$OLD_META_LOGS" "$OLD_DB" "$OLD_BASE" "$OLD_CONFIG")
     NEW_PATHS=("$META_TEMP" "$META_LOGS" "$DB" "$BASE" "$CONFIG")
 
@@ -56,4 +56,16 @@ function replacer() {
         -e "s/commit/calibreweb_version/" $APP/templates/admin.html
 }
 
-replacer && echo "Files patched" || echo "Oh fuck what just happened??"
+replacer && echo -e "Files patched" && \
+    echo -e "List of files that should have been patched: "
+    echo -e "" && sleep 2
+
+for file in $FILES; do
+    for ((path=0;path<${#OLD_PATHS[@]};path++))
+    do
+        grep "${OLD_PATHS[path]}" "$file"
+    done
+done ||
+    { echo -e "oh shit what just happened?!?!" && \
+        exit 1
+    }
